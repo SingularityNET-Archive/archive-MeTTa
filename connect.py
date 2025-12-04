@@ -1,10 +1,31 @@
-from supabase import create_client
+import os
+import psycopg2
+from urllib.parse import urlparse
+from dotenv import load_dotenv
 
-# Replace with your own Supabase credentials
+# Load environment variables from .env file
+load_dotenv()
 
-# Note: You'll need to set SUPABASE_URL and SUPABASE_KEY
-# supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Get credentials from environment variables
+DATABASE_URL = os.getenv("DATABASE_URL")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-def fetch_table(table_name):
-    response = supabase.table(table_name).select("*").execute()
-    return response.data
+# Parse the URL
+url = urlparse(DATABASE_URL)
+dbname = url.path[1:]  # remove leading '/'
+user = url.username
+password = DB_PASSWORD
+host = url.hostname
+port = url.port
+
+# Connect
+conn = psycopg2.connect(
+    dbname=dbname,
+    user=user,
+    password=password,
+    host=host,
+    port=port
+)
+
+cursor = conn.cursor()
+
