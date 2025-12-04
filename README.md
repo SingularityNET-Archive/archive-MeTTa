@@ -1,5 +1,72 @@
 # archive-MeTTa
 
+## Python Environment Setup
+
+Before installing dependencies, set up a Python virtual environment to isolate project dependencies.
+
+### 1. Create a Virtual Environment
+
+Navigate to the project directory and create a virtual environment:
+
+```bash
+cd /path/to/archive-MeTTa
+python3 -m venv .venv
+```
+
+Alternatively, you can use `virtualenv`:
+
+```bash
+python3 -m pip install --user virtualenv
+virtualenv .venv
+```
+
+### 2. Activate the Virtual Environment
+
+**On macOS/Linux:**
+```bash
+source .venv/bin/activate
+```
+
+**On Windows:**
+```bash
+.venv\Scripts\activate
+```
+
+After activation, your terminal prompt should show `(.venv)` indicating the virtual environment is active.
+
+### 3. Upgrade pip
+
+Ensure you have the latest version of pip:
+
+```bash
+pip install --upgrade pip
+```
+
+### 4. Configure PYTHONPATH for Hyperon
+
+After installing hyperon (see installation instructions below), you'll need to add the hyperon path to your environment. This is automatically added to the activation script, but you can verify it's set:
+
+```bash
+# The activation script should include this line:
+export PYTHONPATH="/path/to/hyperon-experimental/python:$PYTHONPATH"
+```
+
+If it's not automatically set, add it manually to `.venv/bin/activate`:
+
+```bash
+echo 'export PYTHONPATH="/path/to/hyperon-experimental/python:$PYTHONPATH"' >> .venv/bin/activate
+```
+
+**Note:** Replace `/path/to/hyperon-experimental` with the actual path where you cloned the hyperon-experimental repository.
+
+### 5. Deactivating the Virtual Environment
+
+When you're done working, you can deactivate the virtual environment:
+
+```bash
+deactivate
+```
+
 ## Installation
 
 This project requires two main dependencies: `supabase` and `hyperon`.
