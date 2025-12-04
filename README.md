@@ -81,10 +81,59 @@ pip install -e /path/to/hyperon-experimental/python[dev]
 
 ### Verify Installation
 
-You can verify both packages are installed correctly:
+You can verify both packages are installed correctly using several methods:
+
+#### Method 1: Check installed packages
 
 ```bash
-python -c "import hyperon; import supabase; print('✓ hyperon installed'); print('✓ supabase installed')"
+pip list | grep -E "(hyperon|supabase)"
+```
+
+You should see:
+- `hyperon` (version 0.2.8 or later)
+- `supabase` (version 2.25.0 or later)
+
+#### Method 2: Test the MeTTa interpreter
+
+The `metta-py` command should be available after installing hyperon:
+
+```bash
+metta-py --help
+```
+
+Or test with a simple MeTTa script:
+
+```bash
+echo '!(+ 1 1)' | metta-py
+```
+
+#### Method 3: Python import test
+
+```bash
+python -c "import supabase; print('✓ supabase installed')"
+python -c "import hyperon; print('✓ hyperon installed')"
+```
+
+#### Method 4: Test metta-py command
+
+```bash
+metta-py --help
+```
+
+**Note:** `hyperon` is not a command-line tool - use `metta-py` instead to run MeTTa scripts.
+
+### Fixing Import Issues
+
+If you encounter `ModuleNotFoundError: No module named 'hyperon'` after installation, the virtual environment may need the hyperon path added to PYTHONPATH. This has been automatically configured in the activation script, but if you need to set it manually:
+
+```bash
+export PYTHONPATH="/path/to/hyperon-experimental/python:$PYTHONPATH"
+```
+
+Or add it to your virtual environment's `activate` script:
+
+```bash
+echo 'export PYTHONPATH="/path/to/hyperon-experimental/python:$PYTHONPATH"' >> .venv/bin/activate
 ```
 
 ### Troubleshooting
