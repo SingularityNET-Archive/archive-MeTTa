@@ -365,6 +365,36 @@ python query_examples.py &
 python -m pdb query_examples.py
 ```
 
+### Recommended Production Pattern: SQL First, Then MeTTa
+
+**In practice, you should almost always query your database first, then use MeTTa for the filtered results.**
+
+Why?
+- ✅ **SQL is fast** at filtering, joining, aggregating large datasets
+- ✅ **Avoids MeTTa panics** by limiting result sets
+- ✅ **Best performance** - use the right tool for each job
+- ✅ **Scalable** - works with millions of records
+
+**Pattern:**
+```python
+# Step 1: Use SQL to filter/limit (fast, no panics)
+cursor.execute("""
+    SELECT id FROM action_items 
+    WHERE status = 'active' 
+      AND assignee = 'John'
+      AND due_date > NOW()
+    LIMIT 100
+""")
+filtered_ids = [row[0] for row in cursor.fetchall()]
+
+# Step 2: Query MeTTa for reasoning/pattern matching on filtered set
+results = query_batch(interp, "action_items", filtered_ids, ["text", "assignee"])
+```
+
+**When to use each:**
+- **Use SQL for:** Filtering, joins, aggregations, large scans, date ranges, text search
+- **Use MeTTa for:** Pattern matching, reasoning, small result sets, knowledge graphs
+
 ### Query Examples
 
 #### 1. List All Atom Types
@@ -513,24 +543,55 @@ print(f"Found {len(ids)} action items")
 
 ### Production Best Practices
 
-#### ✅ Safe Patterns
+#### ✅ Recommended: SQL First, Then MeTTa (Hybrid Approach)
+
+**This is the recommended pattern for production:**
+
+```python
+from connect import query_batch, cursor
+
+# Step 1: Use SQL to filter/limit (fast, handles millions of records)
+cursor.execute("""
+    SELECT id FROM action_items 
+    WHERE status = 'active' 
+      AND assignee = %s
+      AND due_date > NOW()
+    ORDER BY due_date ASC
+    LIMIT 100
+""", ("John",))
+filtered_ids = [row[0] for row in cursor.fetchall()]
+
+# Step 2: Use MeTTa for reasoning on filtered set (small, safe)
+results = query_batch(
+    interp, 
+    "action_items", 
+    filtered_ids, 
+    ["text", "assignee", "status"],
+    batch_size=50
+)
+
+# Now you have filtered data from MeTTa for further processing
+for result in results:
+    # Do reasoning, pattern matching, etc.
+    print(f"{result['assignee']}: {result['text']}")
+```
+
+**Benefits:**
+- ✅ Fast: SQL handles filtering efficiently
+- ✅ Safe: Small result sets avoid MeTTa panics
+- ✅ Scalable: Works with millions of records
+- ✅ Flexible: Use SQL for what it's good at, MeTTa for reasoning
+
+#### ✅ Alternative Safe Patterns
 
 1. **Query by specific ID** - Always safe
    ```python
    result = query_by_id(interp, "table", "specific-id")
    ```
 
-2. **Batch processing** - Safe for multiple IDs
+2. **Batch processing** - Safe for multiple IDs (when you already have the IDs)
    ```python
    results = query_batch(interp, "table", ids, batch_size=50)
-   ```
-
-3. **Hybrid SQL + MeTTa** - Best for large datasets
-   ```python
-   # SQL for filtering
-   ids = sql_query("SELECT id FROM table WHERE condition")
-   # MeTTa for reasoning
-   results = query_batch(interp, "table", ids)
    ```
 
 #### ❌ Avoid These (Causes Panics)
@@ -562,9 +623,63 @@ Atoms are stored in two formats:
 
 1. **Entity atoms**: `(:table_name id_value)`
    - Example: `(:action_items "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0")`
+   - Represents: "This ID exists in the action_items table"
 
 2. **Property atoms**: `(:table_name.property_name id_value property_value)`
    - Example: `(:action_items.text "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0" "Task description")`
+   - Represents: "The 'text' property of this action_item has this value"
+
+### Understanding the Atom Types Output
+
+When you run `print_atom_types()`, you see output like:
+
+```
+Entity Types (from database schema):
+  • :action_items
+    Properties: :action_items.agenda_item_id, :action_items.text, :action_items.assignee, ...
+```
+
+**What this means:**
+
+1. **Entity Types** (e.g., `:action_items`, `:meetings`)
+   - These are your database **table names**
+   - Each table becomes an entity type in MeTTa
+   - You can query: `(:action_items $id)` to find all action item IDs
+
+2. **Properties** (e.g., `:action_items.text`, `:action_items.assignee`)
+   - These are your database **column names**
+   - Format: `:table_name.column_name`
+   - You can query: `(:action_items.text $id $value)` to find text values
+
+3. **The `...` notation**
+   - Means "and more properties" (output is truncated for readability)
+   - Example: `... and 4 more properties` means there are 4 additional columns not shown
+
+4. **Example mapping:**
+   ```
+   Database Table: action_items
+   Columns: id, text, assignee, status, due_date
+   
+   Becomes in MeTTa:
+   - Entity type: :action_items
+   - Properties: 
+     • :action_items.text
+     • :action_items.assignee
+     • :action_items.status
+     • :action_items.due_date
+   ```
+
+5. **How to use this information:**
+   - To query a specific record: Use the entity type with an ID
+   - To get a property value: Use the property type with an ID
+   - Example queries:
+     ```python
+     # Check if record exists
+     query = '!(match &self (:action_items "some-id") $result)'
+     
+     # Get the text property
+     query = '!(match &self (:action_items.text "some-id" $val) $val)'
+     ```
 
 ### Complete Example Script
 

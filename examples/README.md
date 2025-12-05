@@ -18,6 +18,9 @@ python examples/03_batch_query.py
 
 # Query by property value (small result sets only)
 python examples/04_query_property.py
+
+# Hybrid SQL + MeTTa (RECOMMENDED for production)
+python examples/05_hybrid_sql_metta.py
 ```
 
 ## Example Descriptions
@@ -33,6 +36,9 @@ Shows how to query multiple records efficiently using batch processing. Safe for
 
 ### 04_query_property.py
 Demonstrates finding records by property value. **Warning:** Only use for small result sets (<1000 matches).
+
+### 05_hybrid_sql_metta.py ⭐ **RECOMMENDED**
+Demonstrates the **recommended production pattern**: Use SQL to filter/limit large datasets, then pass filtered IDs to MeTTa for reasoning. This is the best approach for production use.
 
 ## Notes
 

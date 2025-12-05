@@ -168,7 +168,7 @@ def row_to_atoms(table, row):
 # -------------------------------------------------------------
 # ATOM TYPE DISCOVERY
 # -------------------------------------------------------------
-def list_atom_types(interp, verify_existence=True):
+def list_atom_types(interp=None, verify_existence=True):
     """
     List all atom types that have been mapped from database fields.
     
@@ -178,8 +178,9 @@ def list_atom_types(interp, verify_existence=True):
     - 'verified': Whether types were verified to exist in MeTTa space
     
     Args:
-        interp: MeTTa interpreter
+        interp: MeTTa interpreter (optional - only needed if verify_existence=True)
         verify_existence: If True, verify each type exists by querying a sample atom
+                          Requires interp to be provided
     """
     tables = get_tables()
     entity_types = []
@@ -198,7 +199,7 @@ def list_atom_types(interp, verify_existence=True):
     }
     
     # Optionally verify types exist in MeTTa by checking a sample atom
-    if verify_existence:
+    if verify_existence and interp is not None:
         verified_entity_types = []
         verified_property_types = {}
         
