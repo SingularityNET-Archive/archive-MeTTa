@@ -221,6 +221,267 @@ If you see errors like `Invalid setting '21' is not a valid 'settings.compiler.v
 - Make sure Rust is in your PATH (`$HOME/.cargo/bin`)
 - For macOS, ensure Xcode command line tools are installed: `xcode-select --install`
 
+## Usage
+
+### Running the Script
+
+1. Set up your environment variables in a `.env` file:
+   ```bash
+   DATABASE_URL=postgresql://user:password@host:port/dbname
+   DB_PASSWORD=your_password
+   ```
+
+2. Run the script:
+   ```bash
+   python connect.py
+   ```
+
+The script will:
+- Connect to your PostgreSQL database
+- Load all tables and data into MeTTa
+- Display atom types
+- Run example queries
+
+### Query Examples
+
+#### 1. List All Atom Types
+
+```python
+from connect import MeTTa, list_atom_types, print_atom_types
+
+interp = MeTTa()
+# ... load data ...
+
+# Print human-readable list
+print_atom_types(interp, verify_existence=True)
+
+# Or get as data structure
+types = list_atom_types(interp)
+print(types['entity_types'])  # ['action_items', 'meetings', ...]
+print(types['property_types']['action_items'])  # ['text', 'assignee', ...]
+```
+
+#### 2. Query a Specific Record by ID
+
+```python
+from connect import MeTTa, query_by_id
+
+interp = MeTTa()
+# ... load data ...
+
+# Query a single record with specific properties
+result = query_by_id(
+    interp, 
+    "action_items", 
+    "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0",
+    properties=["text", "assignee", "status"]
+)
+
+print(result)
+# {
+#   'id': 'e81d16b3-f53d-58f8-ace5-a2a78f0b21f0',
+#   'text': 'Vani to approach DeepFunding...',
+#   'assignee': 'CallyFromAuron',
+#   'status': 'active'
+# }
+```
+
+#### 3. Query Multiple Records (Batch Processing)
+
+```python
+from connect import MeTTa, query_batch
+
+interp = MeTTa()
+# ... load data ...
+
+# Get IDs from database first (hybrid approach)
+ids = ["id1", "id2", "id3", "id4", "id5"]
+
+# Query in batches (safe for large lists)
+results = query_batch(
+    interp,
+    "action_items",
+    ids,
+    properties=["text", "assignee"],
+    batch_size=50  # Process 50 at a time
+)
+
+for result in results:
+    print(f"{result['id']}: {result.get('text', 'N/A')}")
+```
+
+#### 4. Direct MeTTa Query Syntax
+
+You can also use MeTTa queries directly:
+
+```python
+from hyperon import MeTTa
+
+interp = MeTTa()
+# ... load data ...
+
+# Check if a record exists
+query = '!(match &self (:action_items "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0") $result)'
+results = interp.run(query)
+print(results)  # [[$result]] means it exists
+
+# Extract a property value
+query = '!(match &self (:action_items.text "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0" $val) $val)'
+results = interp.run(query)
+print(results)  # [["Vani to approach DeepFunding..."]]
+```
+
+#### 5. Hybrid Approach: SQL + MeTTa
+
+For production use, combine SQL filtering with MeTTa queries:
+
+```python
+from connect import MeTTa, query_batch, fetch_table
+
+interp = MeTTa()
+# ... load data ...
+
+# Step 1: Use SQL to filter/limit (fast, no panics)
+cursor.execute("""
+    SELECT id FROM action_items 
+    WHERE status = 'active' 
+    LIMIT 100
+""")
+filtered_ids = [row[0] for row in cursor.fetchall()]
+
+# Step 2: Query MeTTa for filtered IDs only
+results = query_batch(
+    interp,
+    "action_items",
+    filtered_ids,
+    properties=["text", "assignee"]
+)
+
+# Now you have filtered data from MeTTa
+for result in results:
+    print(f"{result['assignee']}: {result['text']}")
+```
+
+#### 6. Find Records by Property Value
+
+**⚠️ Warning:** Only use for small result sets (<1000 matches):
+
+```python
+from connect import MeTTa, query_by_property_value
+
+interp = MeTTa()
+# ... load data ...
+
+# Find all action items assigned to a specific person
+ids = query_by_property_value(
+    interp,
+    "action_items",
+    "assignee",
+    "CallyFromAuron"
+)
+
+print(f"Found {len(ids)} action items")
+# For large result sets, use SQL instead:
+# SELECT id FROM action_items WHERE assignee = 'CallyFromAuron'
+```
+
+### Production Best Practices
+
+#### ✅ Safe Patterns
+
+1. **Query by specific ID** - Always safe
+   ```python
+   result = query_by_id(interp, "table", "specific-id")
+   ```
+
+2. **Batch processing** - Safe for multiple IDs
+   ```python
+   results = query_batch(interp, "table", ids, batch_size=50)
+   ```
+
+3. **Hybrid SQL + MeTTa** - Best for large datasets
+   ```python
+   # SQL for filtering
+   ids = sql_query("SELECT id FROM table WHERE condition")
+   # MeTTa for reasoning
+   results = query_batch(interp, "table", ids)
+   ```
+
+#### ❌ Avoid These (Causes Panics)
+
+1. **Variable queries with large result sets**
+   ```python
+   # DON'T: This will panic with >10k results
+   query = '!(match &self (:action_items $id) $id)'
+   ```
+
+2. **get_atoms() or atom_count()** - Panics with large spaces
+   ```python
+   # DON'T: Will panic
+   atoms = space.get_atoms()
+   count = space.atom_count()
+   ```
+
+3. **Unfiltered property queries** - Use SQL first
+   ```python
+   # DON'T: Use SQL instead
+   ids = query_by_property_value(interp, "table", "prop", "value")
+   # DO: Use SQL
+   cursor.execute("SELECT id FROM table WHERE prop = %s", (value,))
+   ```
+
+### Atom Type Structure
+
+Atoms are stored in two formats:
+
+1. **Entity atoms**: `(:table_name id_value)`
+   - Example: `(:action_items "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0")`
+
+2. **Property atoms**: `(:table_name.property_name id_value property_value)`
+   - Example: `(:action_items.text "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0" "Task description")`
+
+### Complete Example Script
+
+```python
+#!/usr/bin/env python3
+from hyperon import MeTTa
+from connect import (
+    load_all, 
+    query_by_id, 
+    query_batch, 
+    print_atom_types,
+    fetch_table
+)
+
+# Initialize
+interp = MeTTa()
+
+# Load data
+print("Loading data...")
+load_all(interp)
+
+# List available atom types
+print("\nAvailable atom types:")
+print_atom_types(interp)
+
+# Query a specific record
+print("\nQuerying specific record:")
+result = query_by_id(
+    interp,
+    "action_items",
+    "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0",
+    properties=["text", "assignee"]
+)
+print(result)
+
+# Batch query
+print("\nBatch querying:")
+sample_ids = [row["id"] for row in fetch_table("action_items")[:5]]
+results = query_batch(interp, "action_items", sample_ids, ["text"])
+for r in results:
+    print(f"  {r['id']}: {r.get('text', 'N/A')[:50]}...")
+```
+
 ### References
 
 - [Hyperon Experimental Repository](https://github.com/mvpeterson/hyperon-experimental)
