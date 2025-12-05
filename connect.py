@@ -305,7 +305,12 @@ def query_by_id(interp, table, record_id, properties=None):
                 prop_results = interp.run(query)
                 if prop_results and len(prop_results) > 0:
                     result[prop] = extract_query_value(prop_results)
+            except KeyboardInterrupt:
+                # User interrupted, stop processing
+                break
             except Exception:
+                # Property query failed (may cause panic with some properties)
+                # Set to None and continue with other properties
                 result[prop] = None
     
     return result

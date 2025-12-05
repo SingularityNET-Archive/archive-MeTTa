@@ -242,6 +242,129 @@ The script will:
 - Display atom types
 - Run example queries
 
+### Running Queries in Terminal
+
+#### Option 1: Python Interactive Shell (REPL)
+
+Start an interactive Python session and import the functions:
+
+```bash
+python
+```
+
+Then in the Python shell:
+
+```python
+# Import required modules
+from hyperon import MeTTa
+from connect import (
+    load_all,
+    query_by_id,
+    query_batch,
+    query_by_property_value,
+    print_atom_types,
+    list_atom_types,
+    fetch_table,
+    get_tables
+)
+
+# Initialize MeTTa interpreter
+interp = MeTTa()
+
+# Load all data (this may take a minute)
+load_all(interp)
+
+# Now you can run queries interactively:
+
+# List atom types
+print_atom_types(interp)
+
+# Query a specific record
+result = query_by_id(interp, "action_items", "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0", ["text", "assignee"])
+print(result)
+
+# Get a list of IDs from database
+tables = get_tables()
+if tables:
+    sample_ids = [row["id"] for row in fetch_table(tables[0])[:5]]
+    results = query_batch(interp, tables[0], sample_ids, ["text"])
+    for r in results:
+        print(r)
+```
+
+#### Option 2: Use the Example Query Scripts
+
+**Main script:**
+```bash
+python query_examples.py
+```
+
+**Individual examples** (in `examples/` directory):
+```bash
+# List atom types
+python examples/01_list_atom_types.py
+
+# Query a specific record by ID
+python examples/02_query_by_id.py
+
+# Batch query multiple records
+python examples/03_batch_query.py
+
+# Query by property value (small result sets only)
+python examples/04_query_property.py
+```
+
+Each example script is self-contained and demonstrates a specific query pattern. See `examples/README.md` for details.
+
+#### Option 3: One-Liner Queries
+
+For quick queries, you can use Python one-liners:
+
+```bash
+# List atom types
+python -c "from hyperon import MeTTa; from connect import load_all, print_atom_types; interp = MeTTa(); load_all(interp); print_atom_types(interp)"
+
+# Query a specific ID (replace with your ID)
+python -c "from hyperon import MeTTa; from connect import load_all, query_by_id; interp = MeTTa(); load_all(interp); print(query_by_id(interp, 'action_items', 'e81d16b3-f53d-58f8-ace5-a2a78f0b21f0', ['text']))"
+```
+
+#### Option 4: Using MeTTa Directly
+
+You can also use MeTTa's command-line interface:
+
+```bash
+# Start MeTTa REPL
+metta-py
+```
+
+Then in MeTTa:
+
+```metta
+; Note: You'll need to load atoms first using Python, then you can query:
+!(match &self (:action_items "e81d16b3-f53d-58f8-ace5-a2a78f0b21f0") $result)
+```
+
+**Note:** For MeTTa REPL, you'll need to load atoms first using Python, as the atoms are loaded into the Python interpreter's space.
+
+#### Quick Reference: Common Terminal Commands
+
+```bash
+# Start Python REPL
+python
+
+# Run a Python script
+python query_examples.py
+
+# Run with output to file
+python query_examples.py > results.txt
+
+# Run in background
+python query_examples.py &
+
+# Run with Python debugger
+python -m pdb query_examples.py
+```
+
 ### Query Examples
 
 #### 1. List All Atom Types
@@ -253,13 +376,16 @@ interp = MeTTa()
 # ... load data ...
 
 # Print human-readable list
-print_atom_types(interp, verify_existence=True)
+# Note: Use verify_existence=False with large atom counts to avoid panics
+print_atom_types(interp, verify_existence=False)
 
 # Or get as data structure
-types = list_atom_types(interp)
+types = list_atom_types(interp, verify_existence=False)
 print(types['entity_types'])  # ['action_items', 'meetings', ...]
 print(types['property_types']['action_items'])  # ['text', 'assignee', ...]
 ```
+
+**Note:** With large atom counts (>100k), use `verify_existence=False` to avoid panics. The types are still accurate as they come from the database schema.
 
 #### 2. Query a Specific Record by ID
 
